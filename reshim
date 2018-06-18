@@ -2,10 +2,12 @@
 
 import argparse
 import os
+import shutil
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('directory', type=str, help='directory to process')
+parser.add_argument('--relative-shims', action='store_true', help='make shims relative')
 args = parser.parse_args()
 
 directory = os.path.abspath(args.directory)
@@ -16,6 +18,10 @@ assert os.path.basename(directory) == 'scoop'
 path = '{}\\shims'.format(directory)
 prefix = 'path = '
 
+shimexe = 'scoop/supporting/shimexe/bin/shim.exe'
+if args.relative_shims:
+    assert os.path.isfile(shimexe)
+
 for shim in os.listdir(path):
     if shim.endswith('.shim'):
         full = os.path.join(path, shim)
@@ -25,6 +31,11 @@ for shim in os.listdir(path):
         if content.startswith(prefix):
             print(full)
             index = content.find('\\scoop\\apps')
-            content = prefix + os.path.dirname(directory) + content[index:]
+            if args.relative_shims:
+                new_directory = "..\\.."
+                shutil.copyfile(shimexe, os.path.splitext(full)[0] + '.exe')
+            else:
+                new_directory = os.path.dirname(directory)
+            content = prefix + new_directory + content[index:]
             with open(full, 'w') as f:
                 f.write(content)
