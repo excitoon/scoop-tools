@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+
+import argparse
+import collections
+import hashlib
+import json
+import os
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('package', type=str, help='package to process')
+parser.add_argument('path', type=str, help='path to process')
+args = parser.parse_args()
+
+if '/' in args.package:
+    namespace, name = args.package.split('/')
+else:
+    namespace, name = '__default__', args.package
+
+if namespace == '__default__':
+    bucket_path = os.path.join(os.environ['UserProfile'], 'scoop', 'apps', 'scoop', 'current', 'bucket')
+else:
+    bucket_path = os.path.join(os.environ['UserProfile'], 'scoop', 'buckets', namespace)
+
+package_path = os.path.join(bucket_path, '{}.json'.format(name))
+assert os.path.isfile(package_path)
+
+with open(package_path, encoding='utf-8') as package_file:
+    package = json.loads(package_file.read(), object_pairs_hook=collections.OrderedDict)
+
+assert not 'architecture' in package or len(package['architecture']) == 1
+assert 'url' in package or 'url' in list(package['architecture'].values())[0]
+
+if 'url' in package:
+    target = package
+else:
+    target = next(iter(package['architecture'].values()))
+
+with open(args.path, 'rb') as data_file:
+    target['hash'] = hashlib.sha256(data_file.read()).hexdigest()
+
+with open(package_path, 'w', encoding='utf-8') as package_file:
+    package_file.write(json.dumps(package, indent=4))
