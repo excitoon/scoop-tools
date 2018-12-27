@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import shutil
+import tempfile
+
+import requests
+
+
+shim_url = 'https://github.com/lukesampson/scoop/raw/master/supporting/shimexe/bin/shim.exe'
+
+parser = argparse.ArgumentParser()
+parser.add_argument('directory', type=str, help='directory to process')
+parser.add_argument('--relative-shims', action='store_true', help='make shims relative')
+args = parser.parse_args()
+
+directory = os.path.abspath(args.directory)
+
+assert os.path.isdir(directory)
+assert os.path.basename(directory) == 'scoop'
+
+path = '{}\\shims'.format(directory)
+prefix = 'path = '
+
+with tempfile.NamedTemporaryFile('wb', delete=False) as shim_file:
+    result = requests.get(shim_url)
+    assert result.status_code == 200
+    shim_file.write(result.content)
+    shim_file.close()
+    for shim in os.listdir(path):
+        if shim.endswith('.shim'):
+            full = os.path.join(path, shim)
+            with open(full, 'r', encoding='utf-8-sig') as f:
+                content = f.read()
+            print(content)
+            if content.startswith(prefix):
+                print(full)
+                index = content.find('\\scoop\\apps')
+                if args.relative_shims:
+                    new_directory = "..\\.."
+                else:
+                    new_directory = os.path.dirname(directory)
+                content = prefix + new_directory + content[index:]
+                with open(full, 'w', encoding='utf-8-sig') as f:
+                    f.write(content)
+                shutil.copyfile(shim_file.name, os.path.splitext(full)[0] + '.exe')
