@@ -19,3 +19,14 @@ Updates shims in local Scoop installation.
 ```
 pip3 install requests
 ```
+
+## `scoop-validate`
+
+Validates packages against schema.
+
+### Dependencies
+
+```
+pip3 install jsonschema
+pip3 install requests
+```

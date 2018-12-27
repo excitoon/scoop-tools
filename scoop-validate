@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import shutil
+import sys
+import tempfile
+
+import jsonschema
+import requests
+
+
+schema_url = 'https://github.com/lukesampson/scoop/raw/master/schema.json'
+
+parser = argparse.ArgumentParser()
+parser.add_argument('directory', type=str, help='directory to process')
+args = parser.parse_args()
+
+print('Downloading schema...')
+result = requests.get(schema_url)
+assert result.status_code == 200
+schema = result.json()
+errors = []
+for package in os.listdir(args.directory):
+    if package.endswith('.json'):
+        print('Checking {}...'.format(package))
+        full = os.path.join(args.directory, package)
+        with open(full, 'r', encoding='utf-8') as package_file:
+            try:
+                jsonschema.validate(json.loads(package_file.read()), schema)
+            except Exception as exception:
+                print('Error in {}'.format(package))
+                errors.append((package, exception))
+if errors != []:
+    print()
+    print('Errors:')
+    for package, exception in errors:
+        print('  {}: {}'.format(package, exception))
+    sys.exit(1)
