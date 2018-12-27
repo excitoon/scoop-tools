@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -15,6 +16,7 @@ schema_url = 'https://github.com/lukesampson/scoop/raw/master/schema.json'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('directory', type=str, help='directory to process')
+parser.add_argument('--check-hashes', action='store_true', help='validate hashes')
 args = parser.parse_args()
 
 print('Downloading schema...')
@@ -22,16 +24,52 @@ result = requests.get(schema_url)
 assert result.status_code == 200
 schema = result.json()
 errors = []
+checksums = {}
 for package in os.listdir(args.directory):
     if package.endswith('.json'):
         print('Checking {}...'.format(package))
         full = os.path.join(args.directory, package)
         with open(full, 'r', encoding='utf-8') as package_file:
+            info = None
             try:
-                jsonschema.validate(json.loads(package_file.read()), schema)
+                info = json.loads(package_file.read())
+                jsonschema.validate(info, schema)
             except Exception as exception:
                 print('Error in {}'.format(package))
                 errors.append((package, exception))
+            if args.check_hashes and not info is None:
+                data = []
+                def check_architecture(info, package, data, errors):
+                    try:
+                        if 'url' in info:
+                            assert 'hash' in info, 'No hash for url'
+                            assert isinstance(info['url'], list) == isinstance(info['hash'], list), 'Hashes do not correspond urls'
+                            if not isinstance(info['url'], list):
+                                info['url'] = [ info['url'] ]
+                                info['hash'] = [ info['hash'] ]
+                            data += list(zip(info['url'], info['hash']))
+                        else:
+                            assert not 'hash' in info, 'No url for hash'
+                    except:
+                        print('Error in {}'.format(package))
+                        errors.append((package, exception))
+                check_architecture(info, package, data, errors)
+                if 'architecture' in info:
+                    for architecture, container in info['architecture'].items():
+                        check_architecture(container, package, data, errors)
+                for url, checksum in data:
+                    try:
+                        if url in checksums:
+                            actual_checksum = checksums[url]
+                        else:
+                            result = requests.get(url)
+                            assert result.status_code == 200, 'Could not download {}, status code is {}'.format(url, result.status_code)
+                            checksums[url] = actual_checksum = hashlib.sha256(result.content).hexdigest()
+                        assert actual_checksum == checksum.lower(), 'Checksum for {} is wrong (expected {}, actual {})'.format(url, checksum, actual_checksum)
+                    except Exception as exception:
+                        print('Error in {}'.format(package))
+                        errors.append((package, exception))
+
 if errors != []:
     print()
     print('Errors:')
