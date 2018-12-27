@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('user', type=str, help='user to process')
+args = parser.parse_args()
+
+path = 'c:\\Users\\{}\\scoop\\shims'.format(args.user)
+prefix = 'path = C:\\Users\\'
+
+for shim in os.listdir(path):
+    if shim.endswith('.shim'):
+        full = os.path.join(path, shim)
+        with open(full, 'r', encoding='utf-8-sig') as f:
+            content = f.read()
+        print(content)
+        if content.startswith(prefix):
+            print(full)
+            index = content.find('\\scoop\\apps')
+            content = prefix + args.user + content[index:]
+            with open(full, 'w') as f:
+                f.write(content)
