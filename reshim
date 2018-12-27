@@ -5,11 +5,16 @@ import os
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('user', type=str, help='user to process')
+parser.add_argument('directory', type=str, help='directory to process')
 args = parser.parse_args()
 
-path = 'c:\\Users\\{}\\scoop\\shims'.format(args.user)
-prefix = 'path = C:\\Users\\'
+directory = os.path.abspath(args.directory)
+
+assert os.path.isdir(directory)
+assert os.path.basename(directory) == 'scoop'
+
+path = '{}\\shims'.format(directory)
+prefix = 'path = '
 
 for shim in os.listdir(path):
     if shim.endswith('.shim'):
@@ -20,6 +25,6 @@ for shim in os.listdir(path):
         if content.startswith(prefix):
             print(full)
             index = content.find('\\scoop\\apps')
-            content = prefix + args.user + content[index:]
+            content = prefix + os.path.dirname(directory) + content[index:]
             with open(full, 'w') as f:
                 f.write(content)
